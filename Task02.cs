@@ -19,7 +19,7 @@ namespace Tests
 				values[index - 1] = index > slice ? $"[~{index - slice,2}]" : $"[{index,3}]";
 			}
 
-			// a = 3
+			// a = 2 конечно же, не 3. но все равно сложность О(n) и по памяти и по скорости
 
 			$"\n-- N: {size}; M: {slice}".Log();
 
