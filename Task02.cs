@@ -21,14 +21,13 @@ namespace Tests
 
 			// a = 2 конечно же, не 3. но все равно сложность О(n) и по памяти и по скорости
 
-			$"\n-- N: {size}; M: {slice}".Log();
+			$"\n--\ninput : N: {size}; M: {slice}".Log();
 
-			if(slice > size)
-			{
-				slice = size - 1;
-				slice = slice < 0 ? 0 : slice;
-				$"trimming M to: {slice}".Log();
-			}
+			size = size < 0 ? 0 : size;
+			slice = slice > size ? size - 1 : slice;
+			slice = slice < 0 ? 0 : slice;
+
+			$"assert: N: {size}; M: {slice}".Log();
 
 			$"initial : {string.Join(" ", values)}".Log();
 
