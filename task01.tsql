@@ -1,0 +1,126 @@
+-- mssql version 2019
+
+--! задание 1 вопрос 1
+
+USE master
+DROP DATABASE IF EXISTS test
+GO
+
+CREATE DATABASE test
+GO
+
+USE test
+
+CREATE 
+  TABLE dbo.history (
+    IdAccount INT NOT NULL
+  , OpTime DATETIME2 NOT NULL
+  , Val INT NOT NULL )
+
+ALTER
+  TABLE dbo.history
+  ADD CONSTRAINT unique_key UNIQUE CLUSTERED (
+    IdAccount
+  , OpTime )
+
+-- данные в тестовом файле сохранены как текст по записям, построчно, с ';' в качестве разделителя столбцов
+-- значения суммы аккаунтов указаны подряд
+-- - аккаунт 1: возрастающий
+-- - аккаунт 2: убывающий
+-- - аккаунт 3: сходящийся
+-- идентификаторов счетов всего 3: от 1 до 3
+-- дат всего 3, по 9 банковских операций в каждой
+-- итого записей 27
+
+-- для инициализации:
+-- в качестве источника указать путь к файлу данных:
+-- в формате UNC, в случае сетевой папки
+-- полный путь, в случае, если файл размещен в той же файловой системе что и сервер MSSQL
+-- так же необходимо убедиться в том, что файл доступен для процесса сервера
+DECLARE @source NVARCHAR(MAX) = N'/<source_path>/task01.txt'
+DECLARE @command NVARCHAR(MAX) = N'
+BULK INSERT dbo.history
+FROM ''' + @source + '''
+WITH (
+  FIELDTERMINATOR ='';''
+, ROWTERMINATOR = ''\n''
+, MAXERRORS = 0 );'
+-- , CODEPAGE = ''65001'' -- not supported on Linux
+EXEC dbo.sp_executesql @command
+GO
+
+--! задание 1 вопрос 2
+
+USE test
+
+-- из возможных дат: 2010-01-01, 2010-02-01, 2010-03-01
+DECLARE @date DATE = '2010-02-01'
+
+IF OBJECT_ID('tempdb..#T_balance') IS NOT NULL
+  DROP TABLE #T_balance
+
+CREATE TABLE #T_balance (
+  IdAccount INT NOT NULL
+, OpTimeIn DATETIME2 NOT NULL
+, ValIn INT NOT NULL
+, OpTimeOut DATETIME2 NOT NULL
+, ValOut INT NOT NULL
+, IncomeOn INT NOT NULL
+, OutcomeOn INT NOT NULL )
+
+-- вычисление открытия и закрытия
+INSERT INTO #T_balance (
+  IdAccount
+, OpTimeIn
+, OpTimeOut
+, ValIn 
+, ValOut 
+, IncomeOn
+, OutcomeOn )
+SELECT
+  s.ca
+, s.comin
+, s.comax
+, bmin.Val
+, bmax.Val
+, 0
+, 0
+FROM (
+  SELECT
+    b.IdAccount AS ca
+  , MAX( b.OpTime ) AS comax
+  , MIN( b.OpTime ) AS comin
+  FROM dbo.history AS b ( NOLOCK )
+  WHERE CAST( b.OpTime AS DATE ) = @date
+  GROUP BY b.IdAccount ) AS s
+JOIN dbo.history as bmin ( NOLOCK )
+ON bmin.IdAccount = s.ca AND bmin.OpTime = s.comin
+JOIN dbo.history as bmax ( NOLOCK )
+ON bmax.IdAccount = s.ca AND bmax.OpTime = s.comax
+
+-- вычисление расхода и прихода
+UPDATE
+  #T_balance
+SET 
+  #T_balance.IncomeOn = s.pos
+, #T_balance.OutcomeOn = s.neg
+FROM (
+  SELECT
+    SUM( IIF( s.dc IS NOT NULL AND s.dc > 0, s.dc, 0 ) ) AS pos
+  , SUM( IIF( s.dc IS NOT NULL AND s.dc < 0, s.dc, 0 ) ) AS neg
+  , s.ac
+  FROM
+    ( SELECT
+      b.Val - LAG( b.Val, 1 ) OVER ( PARTITION BY b.IdAccount ORDER BY b.OpTime ) AS dc
+    , b.IdAccount AS ac
+    FROM dbo.history AS b ( NOLOCK )
+    WHERE CAST( b.OpTime AS DATE ) = @date ) AS s
+  GROUP BY s.ac ) AS s
+WHERE
+  s.ac = #T_balance.IdAccount
+
+-- наверняка можно эффективнее.. ,но сделал уже так и ладно..
+SELECT * FROM #T_balance
+DROP TABLE #T_balance
+
+GO
