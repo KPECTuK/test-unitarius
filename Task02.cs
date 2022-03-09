@@ -7,8 +7,11 @@ namespace Tests
 	public class Task02
 	{
 		[TestCase(0, 0)]
+		[TestCase(1, 0)]
 		[TestCase(1, 1)]
 		[TestCase(1, 4)]
+		[TestCase(5, 0)]
+		[TestCase(5, 5)]
 		[TestCase(5, 3)]
 		[TestCase(16, 5)]
 		public void TaskSolution(int size, int slice)
